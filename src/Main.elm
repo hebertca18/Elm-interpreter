@@ -1,76 +1,98 @@
+module Main exposing  (..)
+import Maybe exposing (withDefault)
+import String exposing (String)
 
-type alias NumC = {n : number}
-type alias BoolC = {b : Boolean}
+{--type alias NumC = {n : Float}
+type alias BoolC = {b : Bool}
 type alias StringC = {s : String}
 type alias IfC = {test : ExprC, t : ExprC, f : ExprC}
 type alias InvalidInput = {message : String}
 type alias NonBooleanTestValue = {message : String}
 type alias IdC = {s : String}
 type alias LamC = {params : List String, body : ExprC}
-type alias AppC = {fun : ExprC, args : List ExprC}
-type ExprC = NumC | BoolC | StringC | IdC | LamC | InvalidInput | NonBooleanTestValue
+type alias AppC = {fun : ExprC, args : List ExprC} --}
+type ExprC = NumC Float
+    | BoolC Bool
+    | StringC String
+    | IdC String
+    | LamC (List String) ExprC
+    | IfC ExprC ExprC ExprC
+    | AppC ExprC (List ExprC)
+    | InvalidInputExpr String
+    --| NonBooleanTestValue String
 
-type alias CloV = {arg : List String, body : ExprC, env : Env}
 
+
+{-- type alias CloV = {arg : List String, body : ExprC, env : Env}
 type alias PrimopV = {op : String}
-type alias NumV = {n : number}
-type alias BoolV = {b : Boolean}
+type alias NumV = {n : Float}
+type alias BoolV = {b : Bool}
 type alias StringV = {s : String}
-type alias NonExistentBinding = {message : String}
-type Value = CloV | PrimopV | NumV | BoolV | StringV | NonExistentBinding
+type alias NonExistentBinding = {message : String} --}
+type Value = CloV {arg : List String, body : ExprC, env : Env}
+    | PrimopV String
+    | NumV Float
+    | BoolV Bool
+    | StringV String
+    | NonExistentBinding String
+    | NonBooleanTestInput String
+    | NonBooleanTestValue String
+    | InvalidInput String
 
 type alias Binding = {name : String, val : Value }
-type Env = List Maybe Binding
+type alias Env = List Binding
+--type alias Env = List (Maybe Binding)
+-- type alias Env = {env : Maybe Binding}
 
 type Maybe a = Just a | Nothing
 
 --topInterp : List String -> String
-topInterp s = 
+{--topInterp s = 
     let 
         parsed = parse s 
         val = interp parsed
     in
-        serialize val
+        serialize val--}
 
 topEnv : Env
-topEnv = [Just Binding "+" PrimopV "+", 
-        Just Binding "-" PrimopV "-",
-        Just Binding "/" PrimopV "/",
-        Just Binding "*" PrimopV "*",
-        Just Binding "<=" PrimopV "<=",
-        Just Binding "equal?" PrimopV "equal?",
-        Just Binding "true" BoolV True,
-        Just Binding "false" BoolV False]
+topEnv = [(Binding "+" (PrimopV "+")), 
+        (Binding "-" (PrimopV "-")),
+        (Binding "/" (PrimopV "/")),
+        (Binding "*" (PrimopV "*")),
+        (Binding "<=" (PrimopV "<=")),
+        (Binding "equal?" (PrimopV "equal?")),
+        (Binding "true" (BoolV True)),
+        (Binding "false" (BoolV False))]
 
 interp : ExprC -> Env -> Value
 interp e env = 
     case e of
         NumC n -> NumV n
         StringC s -> StringV s
-        BoolC b -> boolV b
+        BoolC b -> BoolV b
         IfC test t f ->
            let
                 testVal = interp test env 
             in
                 case testVal of
-                    BoolC b ->
+                    BoolV b ->
                         if b then
                             interp t env
                         else
                             interp f env
                     _ -> NonBooleanTestValue ("Non Boolean Value: " ++ serialize testVal)
-        LamC params body -> CloV params body env
+        LamC params body -> CloV {arg = params, body = body, env = env}
         AppC fun args -> 
             let 
                 funval = interp fun env
             in
                 case funval of
-                    CloV arg body cenv ->
-                        if arg.length == args.length then
+                    CloV clo ->
+                        if List.length clo.arg == List.length args then
                             let 
-                                newEnv = bindArguments arg args env
+                                newEnv = bindArguments clo.arg args env
                             in
-                                interp body newEnv
+                                interp clo.body newEnv
                         else 
                             InvalidInput ("Incorrect number of arguments for" ++ serialize fun)
                     PrimopV op -> handlePrimop op args env
@@ -81,7 +103,7 @@ interp e env =
 serialize : Value -> String
 serialize val = 
     case val of
-        NumV n -> String.fromInt(n)
+        NumV n -> String.fromFloat(n)
         CloV _ -> "#<procedure>"
         PrimopV _ -> "#<primop>"
         BoolV b -> if b == True then
@@ -94,52 +116,99 @@ serialize val =
         NonExistentBinding message -> message
         _ -> "ERROR: Unrecognized value."
 
-get : Int -> List a -> Maybe a
+{--get : Int -> List a -> Maybe a
 get nth list =
     list
         |> List.drop (nth - 1)
-        |> List.head
+        |> List.head--}
         
 handlePrimop : String -> List ExprC -> Env -> Value
 handlePrimop op args env = 
     case op of
-        "+" -> if args.length == 2 then
-                let
-                    left = interp args.head env
-                    right = interp args.reverse.head env
-                in
-                    case left of
-                       NumV l -> case right of
-                            NumV r -> l + r
-                            _ -> InvalidInput (right ++ " must evaluate to a number for +")
-                        _ -> InvalidInput (left ++ " must evaluate to a number for +")
+        "+" -> if List.length args == 2 then
+            case args of
+               [a,b] -> let
+                            left = interp a env
+                            right = interp b env
+                        in
+                            case left of
+                                NumV l -> case right of
+                                        NumV r -> NumV (l + r)
+                                        _ -> InvalidInput ((serialize right) ++ " must evaluate to a number for +")
+                                _ -> InvalidInput ((serialize left) ++ " must evaluate to a number for +")
+            else
+                    InvalidInput ("Invalid number of arguments for a primop")
+               
+            {--let
+                left = interp (List.head args) env
+                maybeList = (List.head (List.reverse args))
+            in
+                case maybeList of
+                    Just arg -> 
+                        let 
+                            right = interp arg env
+                        in
+                            case left of
+                                NumV l -> case right of
+                                        NumV r -> NumV (l + r)
+                                        _ -> InvalidInput ((serialize right) ++ " must evaluate to a number for +")
+                                _ -> InvalidInput ((serialize left) ++ " must evaluate to a number for +")
+
+                    Nothing -> InvalidInput "Invalid Expression"
+                    
+                else
+                    InvalidInput ("Invalid number of arguments for a primop")--}
                         
 lookup : Env -> String -> Value
 lookup env s =
     let
-        bind = env.head
+        bind = case env of
+            f::_ -> Just f
+            [] -> Nothing
+        --bind = env.head
     in
         case bind of
-           Just Binding name val ->
-            if bind.name == s then
-                bind.val
+           Just binding ->
+            if binding.name == s then
+                binding.val
             else
-                lookup env.tail s
+                case env of
+                   x :: rest -> lookup rest s
+                   [] -> NonExistentBinding ("The binding for: " ++ s ++ " does not exist.")
+                 {--let
+                    newEnv = List.tail env
+                in
+                    case newEnv of
+                        Just e -> 
+                            case e of
+                               Just x -> lookup x s
+                               Nothing -> NonExistentBinding ("The binding for: " ++ s ++ " does not exist.")
+                        Nothing -> NonExistentBinding ("The binding for: " ++ s ++ " does not exist.")--}
            Nothing -> NonExistentBinding ("No Binding exists for: " ++ s)
 
-bindArguments : List String -> List ExprC -> Env -> Env
+bindArguments : List String -> List ExprC -> List (Maybe Binding) -> Env
 bindArguments listS listE env = 
     let
-        e = listE.head
-        s = listS.head
+        e = List.head listE
+        s = List.head listS
     in
-        case s of
+        let
+            newEnv = case e of
+                              ExprC  -> ((Binding s (interp e env)) :: env) 
+            --newEnv = ((Binding s (interp e env)) :: env) 
+        in
+            case e of
+                x :: restE -> case s of
+                                y :: restS -> bindArguments restS restE newEnv
+                [] -> env
+            --bindArguments (List.tail listS) (List.tail listE) newEnv
+        {-- case s of
             Just name ->
                 let
                     newEnv = ((Binding name e) :: env) 
                 in
-                    bindArguments listS.tail listE.tail newEnv
+                    bindArguments (List.tail listS) (List.tail listE) newEnv
             Nothing ->
-                env
+                env --}
 
                         
