@@ -2,9 +2,9 @@
     "type": "application",
     "source-directories": [
         "src",
-        "../../../../../../../.nvm/versions/node/v11.0.0/lib/node_modules/elm-test/elm/src",
-        "../../../../../src",
-        "../../../../../tests"
+        "..\\..\\..\\..\\..\\..\\..\\..\\AppData\\Roaming\\npm\\node_modules\\elm-test\\elm\\src",
+        "..\\..\\..\\..\\..\\src",
+        "..\\..\\..\\..\\..\\tests"
     ],
     "elm-version": "0.19.1",
     "dependencies": {
